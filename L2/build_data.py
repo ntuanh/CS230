@@ -44,7 +44,7 @@ class Build:
         return x , y
 
 
-build_data = Build(100)
+build_data = Build(10000)
 # build_data.run()
 x , y = build_data.read_data()
 # print(x)
