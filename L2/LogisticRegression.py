@@ -19,11 +19,12 @@ class LogisticRegression:
         self.X_temp = np.array(X)
         self.X = self.X_temp.reshape(10000 , 3, 1)
         self.y = np.array(y)
+
         self.w = {
-            1 : np.random.rand(3 , 6) ,
-            2 : np.random.rand(6 , 1)
+            1 : np.random.rand(3 , 10) ,
+            2 : np.random.rand(10 , 1)
         }
-        self.b1 = np.random.rand(6 , 1)
+        self.b1 = np.random.rand(10 , 1)
         self.b = {
             1 : self.b1,
             2 : np.zeros((1,1))
