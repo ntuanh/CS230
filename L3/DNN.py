@@ -2,27 +2,21 @@ import numpy as np
 from sklearn.datasets import make_moons
 from sklearn.model_selection import train_test_split
 
+from preprocessing import Preprocessing
+
 np.random.seed(42)
 
-X, Y = make_moons(n_samples=30000, noise=0.2)
+# X, Y = make_moons(n_samples=30000, noise=0.2)
 
 class DNN:
     def __init__(self, learning_rate, batch):
         self.lr = learning_rate
         self.batch = batch
 
-        # split
-        X_train, X_test, y_train, y_test = train_test_split(
-            X, Y, test_size=0.2, random_state=42
-        )
+        preprocessing = Preprocessing()
+        self.X , self.X_test , self.y , self.y_test = preprocessing.data()
 
-        # IMPORTANT: reshape to (features, batch)
-        self.X = X_train.T
-        self.y = y_train.reshape(1, -1)
-        self.X_test = X_test.T
-        self.y_test = y_test.reshape(1, -1)
-
-        self.layers = [2, 4, 6 , 4 , 1]
+        self.layers = [preprocessing.get_input_size() , 128 ,  32 ,  1]
         self.L = len(self.layers) - 1
 
         self.w = {}
@@ -32,11 +26,19 @@ class DNN:
 
     # [ Activation functions ] start
     def sigmoid(self, z):
-        return 1 / (1 + np.exp(-z))
+        return np.where(z >= 0,
+                        1 / (1 + np.exp(-z)),
+                        np.exp(z) / (1 + np.exp(z)))
 
     def sigmoid_deriv(self, z):
         s = self.sigmoid(z)
         return s * (1 - s)
+
+    def relu(self , z):
+        return np.maximum(0, z)
+
+    def relu_deriv(self, z):
+        return (z > 0).astype(float)
 
     # [ Activation functions ] end
 
@@ -51,7 +53,7 @@ class DNN:
         for i in range(1, self.L + 1):
             self.z[i] = self.w[i].T @ self.a[i-1] + self.b[i]
             self.a[i] = self.sigmoid(self.z[i])
-
+            # self.a[i] = self.relu(self.z[i])
         return self.a[self.L]
 
     def backward(self, Y):
@@ -72,8 +74,12 @@ class DNN:
             if i > 1:
                 da_prev = self.w[i] @ dz
                 dz = da_prev * self.sigmoid_deriv(self.z[i-1])
+                # dz = da_prev * self.relu_deriv(self.z[i - 1])
 
     def train(self, epochs=100):
+        # print(f"shape of X : {self.X.shape}")
+        # print(f"shape of Y : {self.y.shape}")
+        print("Training loop")
         self.init_weights()
 
         for e in range(epochs):
@@ -82,17 +88,39 @@ class DNN:
                 Yb = self.y[:, i:i+self.batch]
 
                 self.forward(Xb)
+                cost = self.compute_cost(Yb)
                 self.backward(Yb)
 
             if e % 10 == 0:
-                print(f"Epoch {e}, acc: {self.accuracy():.3f}")
+                print(f"Epoch {e} loss {cost} , acc: {self.accuracy():.3f}")
+
+            if cost < 0.001 :
+                self.lr = 0.001
+
+        pred = self.forward(self.X_test)
+        print("pred mean:", np.mean(pred))
+        print("pred min/max:", pred.min(), pred.max())
+
+    def train_accuracy(self):
+        pred = self.forward(self.X)
+        pred = (pred > 0.5).astype(int)
+        return np.mean(pred == self.y)
 
     def accuracy(self):
         pred = self.forward(self.X_test)
         pred = (pred > 0.5).astype(int)
         return np.mean(pred == self.y_test)
 
+    def compute_cost(self, Y):
+        A = self.a[self.L]
+        m = Y.shape[1]
+
+        A = np.clip(A, 1e-8, 1 - 1e-8)
+
+        return -np.sum(Y * np.log(A) + (1 - Y) * np.log(1 - A)) / m
 
 
-model = DNN(learning_rate=0.1, batch=20)
-model.train(epochs=100)
+
+
+model = DNN(learning_rate=0.01, batch=32)
+model.train(epochs=500)
