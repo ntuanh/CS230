@@ -19,6 +19,11 @@ class DNN:
         self.layers = [preprocessing.get_input_size() , 128 ,  32 ,  1]
         self.L = len(self.layers) - 1
 
+        self.speed_w = {}
+        self.speed_b = {}
+
+        self.momentum = 0.9
+
         self.w = {}
         self.b = {}
         self.z = {}
@@ -46,6 +51,8 @@ class DNN:
         for i in range(1, self.L + 1):
             self.w[i] = np.random.randn(self.layers[i-1], self.layers[i]) * np.sqrt(1/self.layers[i-1])
             self.b[i] = np.zeros((self.layers[i], 1))
+            self.speed_b[i] = np.zeros((self.layers[i], 1))
+            self.speed_w[i] = np.zeros((self.layers[i - 1], self.layers[i])) * np.sqrt(1 / self.layers[i - 1])
 
     def forward(self, X):
         self.a[0] = X  # (input, batch)
@@ -67,22 +74,31 @@ class DNN:
             dw = a_prev @ dz.T / m
             db = np.sum(dz, axis=1, keepdims=True) / m
 
+            # momentum
+            self.speed_w[i] = self.momentum * self.speed_w[i] + ( 1 - self.momentum) * dw
+            self.speed_b[i] = self.momentum * self.speed_b[i] + ( 1 - self.momentum) * db
+
+
             # update
-            self.w[i] -= self.lr * dw
-            self.b[i] -= self.lr * db
+            self.w[i] -= self.lr * self.speed_w[i]
+            self.b[i] -= self.lr * self.speed_b[i]
 
             if i > 1:
                 da_prev = self.w[i] @ dz
                 dz = da_prev * self.sigmoid_deriv(self.z[i-1])
-                # dz = da_prev * self.relu_deriv(self.z[i - 1])
 
     def train(self, epochs=100):
         # print(f"shape of X : {self.X.shape}")
         # print(f"shape of Y : {self.y.shape}")
+
+        lr_min = 0.0001
+        lr_max = 0.1
+
         print("Training loop")
         self.init_weights()
 
         for e in range(epochs):
+            self.lr = lr_min + 0.5 * (lr_max - lr_min) * (1 + np.cos(e * np.pi/ epochs))
             for i in range(0, self.X.shape[1], self.batch):
                 Xb = self.X[:, i:i+self.batch]
                 Yb = self.y[:, i:i+self.batch]
@@ -92,7 +108,7 @@ class DNN:
                 self.backward(Yb)
 
             if e % 10 == 0:
-                print(f"Epoch {e} loss {cost} , acc: {self.accuracy():.3f}")
+                print(f"Epoch {e} loss {cost:.7f} , acc: {self.accuracy():.3f} , learning rate {self.lr:.7f}")
 
             if cost < 0.001 :
                 self.lr = 0.001
@@ -123,4 +139,4 @@ class DNN:
 
 
 model = DNN(learning_rate=0.01, batch=32)
-model.train(epochs=500)
+model.train(epochs=200)
