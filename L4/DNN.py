@@ -1,18 +1,20 @@
 import numpy as np
+import time
 # from sklearn.datasets import make_moons
 # from sklearn.model_selection import train_test_split
 
 # from preprocessing import Preprocessing
-from demo import TriangleData
+from preprocessing_data import TriangleData
 
 DATA_NOISE = 0.25
+DATA_TEST = 0.2
 np.random.seed(42)
 
 # X, y = make_moons(n_samples=50000, noise=DATA_NOISE)
 
 
 class DNN:
-    def __init__(self, learning_rate, batch, verbose = False):
+    def __init__(self, learning_rate, batch, verbose=False):
         """
         input data
         shape of X: dimension x size
@@ -26,7 +28,7 @@ class DNN:
         self.verbose = verbose
 
         # preprocessing = Preprocessing()
-        self.X, self.X_test, self.y, self.y_test = TriangleData(num_samples=100000, test_size=0.3).data()
+        self.X, self.X_test, self.y, self.y_test = TriangleData(num_samples=50000, test_size=DATA_TEST).data()
 
         # self.X, self.X_test, self.y, self.y_test = train_test_split(
         #     X, y, test_size=0.2, random_state=42
@@ -67,6 +69,13 @@ class DNN:
         self.vt = {}
         self.epsilon = 1e-8
 
+        # dropout
+        self.p = 0     # fraction of dropout
+        print(f"Dropout ratio {self.p}")
+        self.dropped_nodes = {}     # storage lists index dropped node
+
+        # display
+        self.mean_acc = 0
 
     # [Activation functions] start
     def sigmoid(self, z):
@@ -108,10 +117,21 @@ class DNN:
             return self.relu_deriv(z)
 
     # [ Activation functions ] end
+    # [ Initialization ]
+    def xavier_init(self, n_in, n_out):
+        std = np.sqrt(2.0 / (n_in + n_out))
+        return np.random.normal(loc=0.0, scale=std, size=(n_in,n_out))
+
+    def he_init(self, n_in, n_out):
+        std = np.sqrt(2.0 / n_in)
+        return np.random.normal(loc=0.0, scale=std, size=(n_in,n_out))
 
     def init_weights(self):
         for i in range(1, self.L + 1):
-            self.w[i] = np.random.randn(self.layers[i-1], self.layers[i]) * np.sqrt(1/self.layers[i-1])
+            if self.act_funcs[i] == "relu":
+                self.w[i] = self.he_init(self.layers[i-1], self.layers[i])
+            else :
+                self.w[i] = self.xavier_init(self.layers[i-1], self.layers[i])
             self.b[i] = np.zeros((self.layers[i], 1))
             self.speed_b[i] = np.zeros((self.layers[i], 1))
             self.speed_w[i] = np.zeros((self.layers[i - 1], self.layers[i])) * np.sqrt(1 / self.layers[i - 1])
@@ -123,13 +143,20 @@ class DNN:
             self.mt[f"b{i}"] = np.zeros_like(self.b[i])
             self.vt[f"b{i}"] = np.zeros_like(self.b[i])
 
+    def dropout(self , n):
+        count = int(self.p * n)
+        return np.random.choice(np.arange( n ), size=count, replace=False)
+
     def forward(self, x):
         self.a[0] = x  # (input, batch)
 
         for i in range(1, self.L + 1):
             self.z[i] = self.w[i].T @ self.a[i-1] + self.b[i]
             self.a[i] = self.activation_func(self.z[i], i)
-
+            # print(f"shape of a[i] {self.a[i].shape}")
+            rand_matrix = np.random.rand(*self.a[i].shape)
+            mask = (rand_matrix < (1 - self.p))
+            self.a[i] *= mask
         return self.a[self.L]
 
     def backward(self, y):
@@ -177,8 +204,9 @@ class DNN:
     def train(self, epochs=100):
         # print(f"shape of X: {self.X.shape}")
         # print(f"shape of Y: {self.y.shape}")
+        start_time = time.time_ns()
 
-        print(f"Training loop\t Data noise: {DATA_NOISE}")
+        print(f"Training loop\t Data noise: {DATA_NOISE} \t test: {DATA_TEST}")
         # print("enable shuffle data ")
         self.init_weights()
 
@@ -199,12 +227,11 @@ class DNN:
                 self.backward(Yb)
 
             if e % 10 == 0:
-                print(f"Epoch {e} loss {cost:.7f}, acc: {self.accuracy():.3f}, learning rate {self.lr:.7f}")
+                acc = self.accuracy()
+                self.mean_acc += acc
+                print(f"Epoch {e} \t loss {cost:.7f} \t acc: {acc*100:.2f} %") #, learning rate {self.lr:.7f}")
 
-        # pred = self.forward(self.X_test)
-        # print("pred mean:", np.mean(pred))
-        # print("pred min/max:", pred.min(), pred.max())
-
+        print(f"Finish with total time {(time.time_ns() - start_time) / 1e9} \t mean acc = {self.mean_acc*100 / 20}%")
     def train_accuracy(self):
         pred = self.forward(self.X)
         pred = (pred > 0.5).astype(int)
