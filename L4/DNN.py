@@ -55,6 +55,7 @@ class DNN:
         self.speed_b = {}
 
         self.momentum = 0.9
+        self.lambd = 0.01
 
         self.w = {}
         self.b = {}
@@ -153,7 +154,6 @@ class DNN:
         for i in range(1, self.L + 1):
             self.z[i] = self.w[i].T @ self.a[i-1] + self.b[i]
             self.a[i] = self.activation_func(self.z[i], i)
-            # print(f"shape of a[i] {self.a[i].shape}")
             rand_matrix = np.random.rand(*self.a[i].shape)
             mask = (rand_matrix < (1 - self.p))
             self.a[i] *= mask
@@ -169,6 +169,8 @@ class DNN:
             a_prev = self.a[i-1]
 
             dw = a_prev @ dz.T / m
+            # L2 regularization
+            dw += (self.lambd / m ) * self.w[i]
             db = np.sum(dz, axis=1, keepdims=True) / m
 
             # momentum
@@ -231,7 +233,7 @@ class DNN:
                 self.mean_acc += acc
                 print(f"Epoch {e} \t loss {cost:.7f} \t acc: {acc*100:.2f} %") #, learning rate {self.lr:.7f}")
 
-        print(f"Finish with total time {(time.time_ns() - start_time) / 1e9} \t mean acc = {self.mean_acc*100 / 20}%")
+        print(f"Finish with total time {(time.time_ns() - start_time) / 1e9} \t mean acc = {self.mean_acc*100 / 20:.3f}%")
     def train_accuracy(self):
         pred = self.forward(self.X)
         pred = (pred > 0.5).astype(int)
