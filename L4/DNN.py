@@ -1,20 +1,23 @@
 import numpy as np
 import time
-# from sklearn.datasets import make_moons
-# from sklearn.model_selection import train_test_split
+from sklearn.datasets import make_moons
+from sklearn.model_selection import train_test_split
 
 # from preprocessing import Preprocessing
 from preprocessing_data import TriangleData
+from Activation_funcs import ActivationFunctions
+from Initialization import Initialization
+from Evaluation import Evaluation
 
 DATA_NOISE = 0.25
 DATA_TEST = 0.2
 np.random.seed(42)
 
-# X, y = make_moons(n_samples=50000, noise=DATA_NOISE)
+X, y = make_moons(n_samples=50000, noise=DATA_NOISE)
 
 
-class DNN:
-    def __init__(self, learning_rate, batch, verbose=False):
+class DNN(ActivationFunctions , Initialization , Evaluation ):
+    def __init__(self, learning_rate, batch, verbose=False , my_data=True ):
         """
         input data
         shape of X: dimension x size
@@ -28,15 +31,20 @@ class DNN:
         self.verbose = verbose
 
         # preprocessing = Preprocessing()
-        self.X, self.X_test, self.y, self.y_test = TriangleData(num_samples=50000, test_size=DATA_TEST).data()
 
-        # self.X, self.X_test, self.y, self.y_test = train_test_split(
-        #     X, y, test_size=0.2, random_state=42
-        # )
-        # self.y = self.y.reshape((1, len(self.y)))
-        # self.y_test = self.y_test.reshape((1, len(self.y_test)))
-        # self.X = self.X.T
-        # self.X_test = self.X_test.T
+        self.my_data = my_data
+        if my_data :
+            print("Triangle Data !")
+            self.X, self.X_test, self.y, self.y_test = TriangleData(num_samples=50000, test_size=DATA_TEST).data()
+        else :
+            print("Make Moon Data !")
+            self.X, self.X_test, self.y, self.y_test = train_test_split(
+                X, y, test_size=0.2, random_state=42
+            )
+            self.y = self.y.reshape((1, len(self.y)))
+            self.y_test = self.y_test.reshape((1, len(self.y_test)))
+            self.X = self.X.T
+            self.X_test = self.X_test.T
 
         if self.verbose:
             print(f"len of self.y {len(self.y)}")
@@ -71,95 +79,32 @@ class DNN:
         self.epsilon = 1e-8
 
         # dropout
-        self.p = 0     # fraction of dropout
+        self.p = 0.025    # fraction of dropout
         print(f"Dropout ratio {self.p}")
         self.dropped_nodes = {}     # storage lists index dropped node
 
         # display
         self.mean_acc = 0
 
-    # [Activation functions] start
-    def sigmoid(self, z):
-        return np.where(z >= 0,
-                        1 / (1 + np.exp(-z)),
-                        np.exp(z) / (1 + np.exp(z)))
-
-    def sigmoid_deriv(self, z):
-        s = self.sigmoid(z)
-        return s * (1 - s)
-
-    def relu(self, z):
-        return np.maximum(0, z)
-
-    def relu_deriv(self, z):
-        return (z > 0).astype(float)
-
-    def tanh(self, z):
-        return 2 * self.sigmoid(2*z) - 1
-
-    def tanh_deriv(self, z):
-        return 1 - self.tanh(z)*self.tanh(z)
-
-
-    def activation_func(self, z, i):
-        if self.act_funcs[i] == "sigmoid":
-            return self.sigmoid(z)
-        elif self.act_funcs[i] == "tanh":
-            return self.tanh(z)
-        else:
-            return self.relu(z)
-
-    def activation_func_deriv(self, z, i):
-        if self.act_funcs[i] == "sigmoid":
-            return self.sigmoid_deriv(z)
-        elif self.act_funcs[i] == "tanh":
-            return self.tanh(z)
-        else:
-            return self.relu_deriv(z)
-
-    # [ Activation functions ] end
-    # [ Initialization ]
-    def xavier_init(self, n_in, n_out):
-        std = np.sqrt(2.0 / (n_in + n_out))
-        return np.random.normal(loc=0.0, scale=std, size=(n_in,n_out))
-
-    def he_init(self, n_in, n_out):
-        std = np.sqrt(2.0 / n_in)
-        return np.random.normal(loc=0.0, scale=std, size=(n_in,n_out))
-
-    def init_weights(self):
-        for i in range(1, self.L + 1):
-            if self.act_funcs[i] == "relu":
-                self.w[i] = self.he_init(self.layers[i-1], self.layers[i])
-            else :
-                self.w[i] = self.xavier_init(self.layers[i-1], self.layers[i])
-            self.b[i] = np.zeros((self.layers[i], 1))
-            self.speed_b[i] = np.zeros((self.layers[i], 1))
-            self.speed_w[i] = np.zeros((self.layers[i - 1], self.layers[i])) * np.sqrt(1 / self.layers[i - 1])
-
-            self.mt[f"w{i}"] = np.zeros_like(self.w[i])
-            self.vt[f"w{i}"] = np.zeros_like(self.w[i])
-
-            # Initialize mt and vt for Biases
-            self.mt[f"b{i}"] = np.zeros_like(self.b[i])
-            self.vt[f"b{i}"] = np.zeros_like(self.b[i])
+        self.grads = {}
 
     def dropout(self , n):
         count = int(self.p * n)
         return np.random.choice(np.arange( n ), size=count, replace=False)
 
-    def forward(self, x):
+    def forward(self, x , check_gradient = False ):
         self.a[0] = x  # (input, batch)
 
         for i in range(1, self.L + 1):
             self.z[i] = self.w[i].T @ self.a[i-1] + self.b[i]
             self.a[i] = self.activation_func(self.z[i], i)
-            rand_matrix = np.random.rand(*self.a[i].shape)
-            mask = (rand_matrix < (1 - self.p))
-            self.a[i] *= mask
+            if check_gradient is False:
+                rand_matrix = np.random.rand(*self.a[i].shape)
+                mask = (rand_matrix < (1 - self.p))
+                self.a[i] = (self.a[i] * mask) / (1 - self.p)
         return self.a[self.L]
 
-    def backward(self, y):
+    def backward(self, y , update = True):
         m = y.shape[1]
         self.t += 1
 
@@ -177,14 +122,18 @@ class DNN:
             self.speed_w[i] = self.momentum * self.speed_w[i] + (1 - self.momentum) * dw
             self.speed_b[i] = self.momentum * self.speed_b[i] + (1 - self.momentum) * db
 
-            # adam optimizer update
-            self.w[i] -= self.adam_step(dw, f"w{i}")
-            self.b[i] -= self.adam_step(db, f"b{i}")
+            # SAVE gradients for checking
+            self.grads[f"dw{i}"] = dw
+            self.grads[f"db{i}"] = db
+
+            if update:
+                # adam optimizer update
+                self.w[i] -= self.adam_step(dw, f"w{i}")
+                self.b[i] -= self.adam_step(db, f"b{i}")
 
             if i > 1:
                 da_prev = self.w[i] @ dz
-                # dz = da_prev * self.sigmoid_deriv(self.z[i-1])
-                dz = da_prev * self.activation_func_deriv(self.z[i-1], i)
+                dz = da_prev * self.activation_func_deriv(self.z[i-1], i - 1)
 
     def adam_step(self, gt, key):
         """
@@ -209,7 +158,6 @@ class DNN:
         start_time = time.time_ns()
 
         print(f"Training loop\t Data noise: {DATA_NOISE} \t test: {DATA_TEST}")
-        # print("enable shuffle data ")
         self.init_weights()
 
         for e in range(epochs):
@@ -219,7 +167,6 @@ class DNN:
             self.X = self.X[:, permutation]
             self.y = self.y[:, permutation]
 
-            # self.lr = lr_min + 0.5 * (lr_max - lr_min) * (1 + np.cos(e * np.pi/ epochs))
             for i in range(0, self.X.shape[1], self.batch):
                 Xb = self.X[:, i:i+self.batch]
                 Yb = self.y[:, i:i+self.batch]
@@ -234,23 +181,12 @@ class DNN:
                 print(f"Epoch {e} \t loss {cost:.7f} \t acc: {acc*100:.2f} %") #, learning rate {self.lr:.7f}")
 
         print(f"Finish with total time {(time.time_ns() - start_time) / 1e9} \t mean acc = {self.mean_acc*100 / 20:.3f}%")
-    def train_accuracy(self):
-        pred = self.forward(self.X)
-        pred = (pred > 0.5).astype(int)
-        return np.mean(pred == self.y)
+        total_time = time.time() - start_time
+        return total_time
 
-    def accuracy(self):
-        pred = self.forward(self.X_test)
-        pred = (pred > 0.5).astype(int)
-        return np.mean(pred == self.y_test)
-
-    def compute_cost(self, Y):
-        A = self.a[self.L]
-        m = Y.shape[1]
-
-        A = np.clip(A, 1e-8, 1 - 1e-8)
-
-        return -np.sum(Y * np.log(A) + (1 - Y) * np.log(1 - A)) / m
-
-model = DNN(learning_rate=0.001, batch=32, verbose=False)
-model.train(epochs=200)
+model = DNN(learning_rate=0.001, batch=32, verbose=False , my_data=False)
+model.init_weights()
+X_check = model.X[:, :2]
+Y_check = model.y[:, :2]
+model.run_gradient_check(X_check, Y_check)
+# model.train(epochs=100)
