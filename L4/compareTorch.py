@@ -25,7 +25,8 @@ class TorchDNN(nn.Module):
 
 
 def run_pytorch_benchmark(X_train, y_train, epochs=100, batch_size=32, lr=0.001):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cpu")
     print(f"PyTorch running on: {device}")
 
     # 1. Prepare data
@@ -83,5 +84,5 @@ pytorch_time = run_pytorch_benchmark(model_numpy.X, model_numpy.y, epochs=100)
 print("\n" + "="*30)
 print(f"NumPy Training Time:   {numpy_time:.2f}s")
 print(f"PyTorch Training Time: {pytorch_time:.2f}s")
-print(f"Speedup Factor:        {numpy_time / pytorch_time:.1f}x")
+print(f"Speedup Factor:        {pytorch_time / numpy_time:.1f}x")
 print("="*30)
