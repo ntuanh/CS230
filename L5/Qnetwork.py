@@ -42,3 +42,5 @@ while True :
         s = 1  # Reset
     else:
         s = s_next
+
+        # [curr state , action (0 for left and 1 for right)  , reward , next state , done ]
