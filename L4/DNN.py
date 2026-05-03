@@ -8,15 +8,18 @@ from preprocessing_data import TriangleData
 from Activation_funcs import ActivationFunctions
 from Initialization import Initialization
 from Evaluation import Evaluation
+from Regularization import Regularization
+from Optimization import Optimization
 
+DATA_SIZE = 5000
 DATA_NOISE = 0.25
 DATA_TEST = 0.2
 np.random.seed(42)
 
-X, y = make_moons(n_samples=50000, noise=DATA_NOISE)
+X, y = make_moons(n_samples=DATA_SIZE, noise=DATA_NOISE)
 
 
-class DNN(ActivationFunctions , Initialization , Evaluation ):
+class DNN(ActivationFunctions , Initialization , Evaluation , Regularization , Optimization):
     def __init__(self, learning_rate, batch, verbose=False , my_data=True ):
         """
         input data
@@ -35,7 +38,7 @@ class DNN(ActivationFunctions , Initialization , Evaluation ):
         self.my_data = my_data
         if my_data :
             print("Triangle Data !")
-            self.X, self.X_test, self.y, self.y_test = TriangleData(num_samples=50000, test_size=DATA_TEST).data()
+            self.X, self.X_test, self.y, self.y_test = TriangleData(num_samples=DATA_SIZE, test_size=DATA_TEST).data()
         else :
             print("Make Moon Data !")
             self.X, self.X_test, self.y, self.y_test = train_test_split(
@@ -79,7 +82,7 @@ class DNN(ActivationFunctions , Initialization , Evaluation ):
         self.epsilon = 1e-8
 
         # dropout
-        self.p = 0.025    # fraction of dropout
+        self.p = 0.015    # fraction of dropout
         print(f"Dropout ratio {self.p}")
         self.dropped_nodes = {}     # storage lists index dropped node
 
@@ -87,10 +90,6 @@ class DNN(ActivationFunctions , Initialization , Evaluation ):
         self.mean_acc = 0
 
         self.grads = {}
-
-    def dropout(self , n):
-        count = int(self.p * n)
-        return np.random.choice(np.arange( n ), size=count, replace=False)
 
     def forward(self, x , check_gradient = False ):
         self.a[0] = x  # (input, batch)
@@ -135,23 +134,6 @@ class DNN(ActivationFunctions , Initialization , Evaluation ):
                 da_prev = self.w[i] @ dz
                 dz = da_prev * self.activation_func_deriv(self.z[i-1], i - 1)
 
-    def adam_step(self, gt, key):
-        """
-       :param gt: The gradient (dw or db)
-       :param key: A unique string/tuple identifying the parameter (e.g., "w1", "b1")
-        """
-        # 1. Update the persistent state in the dictionaries
-        self.mt[key] = self.beta_1 * self.mt[key] + (1 - self.beta_1) * gt
-        self.vt[key] = self.beta_2 * self.vt[key] + (1 - self.beta_2) * (gt ** 2)
-
-        # 2. Bias correction
-        # Note: Use self.t (the global update counter)
-        mt_corr = self.mt[key] / (1 - self.beta_1 ** self.t)
-        vt_corr = self.vt[key] / (1 - self.beta_2 ** self.t)
-
-        # 3. Calculate and return the update
-        return self.lr * mt_corr / (np.sqrt(vt_corr) + self.epsilon)
-
     def train(self, epochs=100):
         # print(f"shape of X: {self.X.shape}")
         # print(f"shape of Y: {self.y.shape}")
@@ -174,14 +156,16 @@ class DNN(ActivationFunctions , Initialization , Evaluation ):
                 self.forward(Xb)
                 cost = self.compute_cost(Yb)
                 self.backward(Yb)
+                print(f"shape of Yb {Yb.shape}")    # (1 , 32) 1 feature , batch size 32
 
             if e % 10 == 0:
                 acc = self.accuracy()
-                self.mean_acc += acc
+                if e > 0 :
+                    self.mean_acc += acc
                 print(f"Epoch {e} \t loss {cost:.7f} \t acc: {acc*100:.2f} %") #, learning rate {self.lr:.7f}")
 
-        print(f"Finish with total time {(time.time_ns() - start_time) / 1e9} \t mean acc = {self.mean_acc*100 / 20:.3f}%")
-        total_time = time.time() - start_time
+        total_time = (time.time_ns() - start_time) / 1e9
+        print(f"Finish with total time {total_time} \t mean acc = {self.mean_acc*100 / 19:.3f}%")
         return total_time
 
 model = DNN(learning_rate=0.001, batch=32, verbose=False , my_data=False)
@@ -189,4 +173,4 @@ model.init_weights()
 X_check = model.X[:, :2]
 Y_check = model.y[:, :2]
 model.run_gradient_check(X_check, Y_check)
-# model.train(epochs=100)
+model.train(epochs=100)
