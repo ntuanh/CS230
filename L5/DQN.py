@@ -134,7 +134,7 @@ class DQN(ActivationFunctions , Initialization , Evaluation , Regularization , O
             else :
                 target_value = r + self.gamma * max(q_next[0][0] , q_next[1][0])
 
-            target_y = self.forward(self.ont_hot_vector(s_next)).copy()
+            target_y = self.forward(self.ont_hot_vector(s)).copy()
 
             if is_right:
                 target_y[1][0] = target_value
@@ -159,6 +159,7 @@ class DQN(ActivationFunctions , Initialization , Evaluation , Regularization , O
         s = 1
         cnt = 0
         cnt_prev = 0
+        reached = 0
 
         while True :
             cnt += 1
@@ -188,11 +189,13 @@ class DQN(ActivationFunctions , Initialization , Evaluation , Regularization , O
                 temp_d = [s, action_is_right, reward_left_true, s_next, s_next == self.total_state]
                 self.D.append(temp_d)
             # print(f"state : {s}\t action {action_str}\tto state {s_next}")
-            # print(f"state {s} || [ {reward_left:.3f} , {reward_right:.3f} ]\taction {action_str}")
+            # print(f"state {s} || [ {reward_left:.3f} , {reward_right:.3f} ]\t")
+                  # f"action {action_str}")
             # print(f"reward : {temp_reward}")
 
             if s_next == self.total_state :
-                print(f"\nReach to Treasure ! \t \t count to treasure {cnt - cnt_prev}.")
+                reached += 1
+                print(f"\nReach to Treasure ! \t \t step to treasure {cnt - cnt_prev} \t count to treasure {reached}")
                 for i in range(1 , self.total_state):
                     r = self.forward(self.ont_hot_vector(i))
                     print(f"[{r[0][0]:.3f} , {r[1][0]:.3f}]" , end="\t")
@@ -207,7 +210,9 @@ class DQN(ActivationFunctions , Initialization , Evaluation , Regularization , O
                 self.Q_epsilon = 0.1
             if cnt > 50 :
                 self.Q_epsilon = 0
-            if cnt > 200 :
+            if cnt > 100 :
+                print()
+                print(cnt - cnt_prev)
                 break
 
 
