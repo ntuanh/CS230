@@ -1,8 +1,17 @@
 import numpy as np
 import time
-from sklearn.datasets import make_moons
-from sklearn.model_selection import train_test_split
 
+DATA_SIZE = 5000
+DATA_NOISE = 0.25
+DATA_TEST = 0.2
+np.random.seed(42)
+
+# use data of sklearn
+# from sklearn.datasets import make_moons
+# from sklearn.model_selection import train_test_split
+# X, y = make_moons(n_samples=DATA_SIZE, noise=DATA_NOISE)
+
+# use my data - Triangle Data
 # from preprocessing import Preprocessing
 from preprocessing_data import TriangleData
 from Activation_funcs import ActivationFunctions
@@ -11,12 +20,7 @@ from Evaluation import Evaluation
 from Regularization import Regularization
 from Optimization import Optimization
 
-DATA_SIZE = 5000
-DATA_NOISE = 0.25
-DATA_TEST = 0.2
-np.random.seed(42)
 
-X, y = make_moons(n_samples=DATA_SIZE, noise=DATA_NOISE)
 
 
 class DNN(ActivationFunctions , Initialization , Evaluation , Regularization , Optimization):
@@ -39,15 +43,15 @@ class DNN(ActivationFunctions , Initialization , Evaluation , Regularization , O
         if my_data :
             print("Triangle Data !")
             self.X, self.X_test, self.y, self.y_test = TriangleData(num_samples=DATA_SIZE, test_size=DATA_TEST).data()
-        else :
-            print("Make Moon Data !")
-            self.X, self.X_test, self.y, self.y_test = train_test_split(
-                X, y, test_size=0.2, random_state=42
-            )
-            self.y = self.y.reshape((1, len(self.y)))
-            self.y_test = self.y_test.reshape((1, len(self.y_test)))
-            self.X = self.X.T
-            self.X_test = self.X_test.T
+        # else :
+        #     print("Make Moon Data !")
+        #     self.X, self.X_test, self.y, self.y_test = train_test_split(
+        #         X, y, test_size=0.2, random_state=42
+        #     )
+        #     self.y = self.y.reshape((1, len(self.y)))
+        #     self.y_test = self.y_test.reshape((1, len(self.y_test)))
+        #     self.X = self.X.T
+        #     self.X_test = self.X_test.T
 
         if self.verbose:
             print(f"len of self.y {len(self.y)}")
@@ -156,7 +160,7 @@ class DNN(ActivationFunctions , Initialization , Evaluation , Regularization , O
                 self.forward(Xb)
                 cost = self.compute_cost(Yb)
                 self.backward(Yb)
-                print(f"shape of Yb {Yb.shape}")    # (1 , 32) 1 feature , batch size 32
+                # print(f"shape of Yb {Yb.shape}")    # (1 , 32) 1 feature , batch size 32
 
             if e % 10 == 0:
                 acc = self.accuracy()
@@ -168,9 +172,9 @@ class DNN(ActivationFunctions , Initialization , Evaluation , Regularization , O
         print(f"Finish with total time {total_time} \t mean acc = {self.mean_acc*100 / 19:.3f}%")
         return total_time
 
-model = DNN(learning_rate=0.001, batch=32, verbose=False , my_data=False)
+model = DNN(learning_rate=0.001, batch=32, verbose=False , my_data=True)
 model.init_weights()
 X_check = model.X[:, :2]
 Y_check = model.y[:, :2]
 model.run_gradient_check(X_check, Y_check)
-model.train(epochs=100)
+model.train(epochs=200)
